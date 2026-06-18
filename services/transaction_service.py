@@ -55,16 +55,20 @@ def rent_equipment(member_id, equipment_id, quantity, hours, booking_id=None):
                                            quantity, hours, amount, status)
             VALUES (?, ?, ?, ?, ?, ?, 'active')
         """, (booking_id, member_id, equipment_id, quantity, hours, amount))
+        rental_id = cur.lastrowid
 
         conn.execute("""
             UPDATE equipment SET stock = stock - ? WHERE id=?
         """, (quantity, equipment_id))
 
         if amount > 0:
-            add_transaction(member_id, booking_id, 'equipment', amount,
-                          f"租赁{eq['name']} x{quantity} {hours}小时")
+            conn.execute("""
+                INSERT INTO transactions (member_id, booking_id, type, amount, description)
+                VALUES (?, ?, 'equipment', ?, ?)
+            """, (member_id, booking_id, amount,
+                  f"租赁{eq['name']} x{quantity} {hours}小时"))
 
-        return True, cur.lastrowid
+    return True, rental_id
 
 
 def return_equipment(rental_id):

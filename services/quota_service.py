@@ -6,27 +6,40 @@ def get_current_ym():
     return datetime.now().strftime("%Y-%m")
 
 
-def ensure_member_quota(member_id):
-    ym = get_current_ym()
-    with get_conn() as conn:
-        member = conn.execute(
-            "SELECT monthly_quota FROM members WHERE id=?", (member_id,)
-        ).fetchone()
-        if not member:
-            return None
-        monthly_quota = member['monthly_quota']
+def _ensure_quota_with_conn(conn, member_id, ym):
+    member = conn.execute(
+        "SELECT monthly_quota FROM members WHERE id=?", (member_id,)
+    ).fetchone()
+    if not member:
+        return None
+    monthly_quota = member['monthly_quota']
+    existing = conn.execute("""
+        SELECT * FROM member_quotas WHERE member_id=? AND year_month=?
+    """, (member_id, ym)).fetchone()
+    if not existing:
+        conn.execute("""
+            INSERT INTO member_quotas (member_id, year_month, total_quota, used_quota)
+            VALUES (?, ?, ?, 0)
+        """, (member_id, ym, monthly_quota))
         existing = conn.execute("""
             SELECT * FROM member_quotas WHERE member_id=? AND year_month=?
         """, (member_id, ym)).fetchone()
-        if not existing:
-            conn.execute("""
-                INSERT INTO member_quotas (member_id, year_month, total_quota, used_quota)
-                VALUES (?, ?, ?, 0)
-            """, (member_id, ym, monthly_quota))
-            existing = conn.execute("""
-                SELECT * FROM member_quotas WHERE member_id=? AND year_month=?
-            """, (member_id, ym)).fetchone()
-        return dict(existing)
+    return dict(existing)
+
+
+def _ensure_all_members_quotas(ym=None):
+    if ym is None:
+        ym = get_current_ym()
+    with get_conn() as conn:
+        members = conn.execute("SELECT id, monthly_quota FROM members").fetchall()
+        for m in members:
+            _ensure_quota_with_conn(conn, m['id'], ym)
+
+
+def ensure_member_quota(member_id):
+    ym = get_current_ym()
+    with get_conn() as conn:
+        return _ensure_quota_with_conn(conn, member_id, ym)
 
 
 def use_quota_if_available(member_id):
@@ -60,7 +73,12 @@ def reset_monthly_quotas(ym=None):
             existing = conn.execute("""
                 SELECT id FROM member_quotas WHERE member_id=? AND year_month=?
             """, (m['id'], ym)).fetchone()
-            if not existing:
+            if existing:
+                conn.execute("""
+                    UPDATE member_quotas SET total_quota=?, used_quota=0
+                    WHERE id=?
+                """, (m['monthly_quota'], existing['id']))
+            else:
                 conn.execute("""
                     INSERT INTO member_quotas (member_id, year_month, total_quota, used_quota)
                     VALUES (?, ?, ?, 0)
@@ -70,6 +88,7 @@ def reset_monthly_quotas(ym=None):
 def get_all_quotas(ym=None):
     if ym is None:
         ym = get_current_ym()
+    _ensure_all_members_quotas(ym)
     with get_conn() as conn:
         return [dict(r) for r in conn.execute("""
             SELECT q.*, m.name as member_name, m.phone, m.member_type
