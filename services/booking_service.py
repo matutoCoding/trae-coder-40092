@@ -22,7 +22,7 @@ def check_conflict(wall_id, date_str, start_time, end_time, exclude_booking_id=N
 
 
 def create_booking(member_id, wall_id, date_str, start_time, end_time):
-    from services.quota_service import _ensure_quota_with_conn, _check_quota_available
+    from services.quota_service import _ensure_quota_with_conn
 
     if check_conflict(wall_id, date_str, start_time, end_time):
         return False, "该时段已被预约，请选择其他时段"
@@ -49,7 +49,7 @@ def create_booking(member_id, wall_id, date_str, start_time, end_time):
         cur = conn.execute("""
             INSERT INTO bookings (member_id, wall_id, slot_id, date, start_time, end_time,
                                   status, use_quota, is_paid, amount)
-            VALUES (?, ?, 0, ?, ?, ?, 'booked', ?, ?, ?)
+            VALUES (?, ?, NULL, ?, ?, ?, 'booked', ?, ?, ?)
         """, (member_id, wall_id, date_str, start_time, end_time,
               1 if use_quota else 0, 1 if should_pay else 0, amount))
         booking_id = cur.lastrowid

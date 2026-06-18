@@ -67,7 +67,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             member_id INTEGER NOT NULL,
             wall_id INTEGER NOT NULL,
-            slot_id INTEGER NOT NULL,
+            slot_id INTEGER,
             date TEXT NOT NULL,
             start_time TEXT NOT NULL,
             end_time TEXT NOT NULL,
@@ -77,8 +77,7 @@ def init_db():
             amount REAL DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (member_id) REFERENCES members(id),
-            FOREIGN KEY (wall_id) REFERENCES walls(id),
-            FOREIGN KEY (slot_id) REFERENCES time_slots(id)
+            FOREIGN KEY (wall_id) REFERENCES walls(id)
         );
 
         CREATE TABLE IF NOT EXISTS equipment (
